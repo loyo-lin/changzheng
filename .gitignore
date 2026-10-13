@@ -1,0 +1,5 @@
+qr/
+labels.json
+build.json
+*.tmp
+*.bak
