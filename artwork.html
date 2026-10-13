@@ -38,9 +38,12 @@
   --sans:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB",
     "Microsoft YaHei","Source Han Sans SC","Noto Sans CJK SC",sans-serif;
   --ease:cubic-bezier(.22,.72,.28,1);
-  /* 地图容器高度必须接近路线画布的比例（900:1000），否则 SVG 为放进
-     扁盒子会被整体缩小，标签字号随之掉到不可读 —— 这是之前字太小的根因 */
-  --mapH:62vh;
+  /* 地图容器高度 —— 手机竖屏时地图与正文大致四六开，所以取 40vh。
+     下限 250px 是保护：矮屏上 40vh 会让地图太扁，SVG 按宽度缩下去
+     标签就跟着变小读不清（这是之前"字太小"的根因）。
+     竖屏还会切成核心框（见 fitMapBox），所以 40vh 也撑得住。
+     宽屏是左图右文布局，高度另算，不受这个值影响。 */
+  --mapH:max(250px, 40vh);
   --maxw:700px;
   --wide:1300px;
 
