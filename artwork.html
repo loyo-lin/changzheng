@@ -296,9 +296,14 @@ body::before{
 }
 .fig-row .fig + .fig{border-left:1px solid rgba(110,8,16,.12)}
 .fig-row .fig .lbl{padding:0;text-align:left}
-/* 巨号数字：重量压在底部，单位字紧贴着 */
+/* 巨号数字：重量压在底部，单位字紧贴着
+   结构：.n = 纵向 flex；.num 是「数字 + 单位」那一行；.rule 是下面的金线。
+   为什么不用 ::after 绝对定位：.n 的 line-height 是 .76，行盒比字矮，
+   数字墨迹上下都溢出盒子（实测墨迹底比盒底还低约 0.09em），
+   靠 bottom 的 em 猜位置在各断点上都不稳 —— 要么脱开一截，要么压到字脚。
+   改成一个真实的 flex 行之后，间距由 margin-top 明确控制。 */
 .fig .n{
-  flex:0 0 auto;position:relative;display:flex;align-items:flex-end;
+  flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;
   font-family:var(--serif);font-weight:900;line-height:.76;
   font-size:clamp(70px,21vw,132px);letter-spacing:-.06em;
   background:linear-gradient(165deg,#D4292F 0%,#96121B 48%,#5C0A11 100%);
@@ -308,12 +313,16 @@ body::before{
 .fig-row .fig .n{font-size:clamp(42px,12.5vw,78px)}
 .fig .n s{
   text-decoration:none;font-size:.30em;font-weight:800;line-height:1;
-  letter-spacing:.06em;margin:0 0 .16em .10em;
+  letter-spacing:.06em;margin:0 0 .14em .12em;
   background:none;-webkit-text-fill-color:#8A6A22;color:#8A6A22;
 }
-.fig .n::after{
-  content:"";position:absolute;left:.02em;right:.16em;bottom:-.09em;height:3px;
-  background:linear-gradient(90deg,rgba(195,160,90,.9),rgba(195,160,90,.04));
+/* 数字本体 + 单位，排在一行 */
+.fig .n .num{display:flex;align-items:flex-end;white-space:nowrap}
+/* 数字下面那条金线：宽度 = 数字 + 单位，间距随字号缩放 */
+.fig .n .rule{
+  display:block;height:3px;width:100%;margin-top:.06em;flex:0 0 auto;
+  background:linear-gradient(90deg,rgba(195,160,90,.94),
+    rgba(195,160,90,.70) 76%,rgba(195,160,90,.30));
 }
 .fig .lbl{flex:1;min-width:0;padding-bottom:.5em}
 .fig .lbl b{
@@ -324,13 +333,9 @@ body::before{
   display:block;margin-top:6px;font-family:var(--serif);
   font-size:12.5px;letter-spacing:.14em;color:var(--ink-3);
 }
-/* 主数字：整行视觉锚点，下方留出下划线空间 */
-.fig.hero-num{padding-bottom:clamp(14px,3.6vw,20px)}
+/* 主数字：整行视觉锚点，下方留出金线空间 */
+.fig.hero-num{padding-bottom:clamp(10px,2.6vw,16px)}
 .fig.hero-num .n{font-size:clamp(112px,34vw,220px)}
-/* 横线只画在数字本身下面。
-   宽度用 ch（等于数字的字符宽）而不是百分比 —— 百分比在窄屏会
-   跟着整行拉长，横线就跑到屏幕边上了 */
-.fig.hero-num .n::after{bottom:-.05em;left:.02em;right:auto;width:2.7ch}
 /* 窄屏：数字太大（34vw ≈ 218px），右边只剩 48px，而「行程」两个字要 49.7px、
    「二万五千里」要 96px —— 会被拆成竖排/三行。
    所以窄屏让标签换到数字下面一行，两个都能完整显示。 */
@@ -972,20 +977,20 @@ html.js .rv.in{opacity:1;transform:none}
 
     <div class="figures">
       <div class="fig hero-num rv">
-        <span class="n">2.5<s>万里</s></span>
+        <span class="n"><span class="num">2.5<s>万里</s></span><i class="rule"></i></span>
         <span class="lbl"><b>行 程</b><span>二万五千里</span></span>
       </div>
       <div class="fig-row">
         <div class="fig rv">
-          <span class="n">14<s>省</s></span>
+          <span class="n"><span class="num">14<s>省</s></span><i class="rule"></i></span>
           <span class="lbl"><b>纵 横</b><span>十余省</span></span>
         </div>
         <div class="fig rv">
-          <span class="n">24<s>条</s></span>
+          <span class="n"><span class="num">24<s>条</s></span><i class="rule"></i></span>
           <span class="lbl"><b>渡过江河</b><span>江河险阻</span></span>
         </div>
         <div class="fig rv">
-          <span class="n">18<s>座</s></span>
+          <span class="n"><span class="num">18<s>座</s></span><i class="rule"></i></span>
           <span class="lbl"><b>翻越山脉</b><span>高山险峰</span></span>
         </div>
       </div>
