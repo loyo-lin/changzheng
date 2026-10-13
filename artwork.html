@@ -318,11 +318,13 @@ body::before{
 }
 /* 数字本体 + 单位，排在一行 */
 .fig .n .num{display:flex;align-items:flex-end;white-space:nowrap}
-/* 数字下面那条金线：宽度 = 数字 + 单位，间距随字号缩放 */
+/* 数字下面那条金线：宽度 = 数字 + 单位，间距随字号缩放。
+   渐变尾端别淡得太狠 —— 之前 76% 处就掉到 .30 透明度，
+   在米色底上基本看不见，整条线看着像只画了一半。 */
 .fig .n .rule{
   display:block;height:3px;width:100%;margin-top:.06em;flex:0 0 auto;
-  background:linear-gradient(90deg,rgba(195,160,90,.94),
-    rgba(195,160,90,.70) 76%,rgba(195,160,90,.30));
+  background:linear-gradient(90deg,rgba(195,160,90,.95) 0%,
+    rgba(195,160,90,.92) 62%,rgba(195,160,90,.62) 100%);
 }
 .fig .lbl{flex:1;min-width:0;padding-bottom:.5em}
 .fig .lbl b{
