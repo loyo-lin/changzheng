@@ -1010,7 +1010,11 @@ html.js .rv.in{opacity:1;transform:none}
       <span class="cnt" id="pcnt">1 / 11</span>
     </div>
     <div class="mapbox">
+      <!-- data-full = 完整地图范围；data-core = 路线核心范围（含标签）。
+           竖屏窄容器里显示整张图会被压小、上下留大片空白，
+           所以窄屏由脚本切成 data-core，只留中间有内容的这一块。 -->
       <svg id="mapsvg" viewBox="0 0 1000 900" preserveAspectRatio="xMidYMid meet" role="img"
+           data-full="0 0 1000 900" data-core="1.1 75.8 786.7 701.3"
            aria-label="红军长征路线示意图，自江西瑞金至甘肃会宁">
         <defs>
           <linearGradient id="routeGrad" x1="0" y1="1" x2="1" y2="0">
@@ -1364,16 +1368,19 @@ html.js .rv.in{opacity:1;transform:none}
   }
 
   /* ---------- 开发用自动刷新 ----------
-     python _tools/watch.py 每次重建都会改 build.json 的版本号，
+     python tools/watch.py 每次重建都会改 build.json 的版本号，
      页面发现版本变了就自己刷新，所以改样式/尺寸也不用手动按 F5。
-     正式部署时没有 build.json，这段空转。 */
+     正式部署时没有 build.json —— 第一次 404 就停掉轮询，
+     免得线上白白每 0.9 秒发一个必然失败的请求。 */
   (function autoReload(){
-    var seen = null;
+    var seen = null, stop = false;
     function poll(){
+      if (stop) return;
       var req = new XMLHttpRequest();
       try { req.open("GET", "build.json?t=" + Date.now(), true); }
       catch(e){ return; }
       req.onload = function(){
+        if (req.status === 404){ stop = true; return; }   // 正式环境，停
         if (req.status !== 200) return;
         var v;
         try { v = JSON.parse(req.responseText).v; } catch(e){ return; }
@@ -1390,11 +1397,11 @@ html.js .rv.in{opacity:1;transform:none}
   /* ---------- 标签热重载（本地调标签用） ----------
      页面旁若存在 labels.json，就每 700ms 拉一次；内容一变，
      直接把新坐标套到已渲染的标签上，不重建页面、不刷新。
-     正式部署时没有这个文件，这段自动空转，不影响任何东西。 */
+     正式部署时没有这个文件 —— 第一次 404 就停掉轮询。 */
   (function hotLabels(){
     var groups = [].slice.call(document.querySelectorAll("#mapsvg .nd"));
     if (!groups.length) return;
-    var cache = null;
+    var cache = null, stop = false;
     var NAME_DY = -6, DATE_DY = 14;   // 与 build_artwork.py 的 NAME_DY / DATE_DY 保持一致
     function apply(map){
       for (var k in map){
@@ -1419,10 +1426,12 @@ html.js .rv.in{opacity:1;transform:none}
       }
     }
     function poll(){
+      if (stop) return;
       var req = new XMLHttpRequest();
       try { req.open("GET", "labels.json?t=" + Date.now(), true); }
       catch(e){ return; }
       req.onload = function(){
+        if (req.status === 404){ stop = true; return; }   // 正式环境，停
         if (req.status !== 200) return;
         var d;
         try { d = JSON.parse(req.responseText); } catch(e){ return; }
@@ -1440,6 +1449,82 @@ html.js .rv.in{opacity:1;transform:none}
 
   /* ---------- 地图：节点点亮 / 行进标记 / 行程条 ---------- */
   var svg = document.getElementById("mapsvg");
+
+  /* ---------- 竖屏：地图只显示路线核心区 ----------
+     整张 viewBox 是 1000x900，但路线只占中间一块，四周（尤其左右）是
+     大片留白。窄屏容器又窄又高，preserveAspectRatio="meet" 会把整张图
+     按宽度缩下去，上下就空出两大条 —— 换算成手机屏差不多一百多像素。
+     所以窄屏切成 data-core（路线 + 标签的包围盒），把空白去掉，省下的
+     高度留给下面的文字介绍。
+
+     viewBox 变小以后图会整体放大，所以标签字号要按反比缩回去，
+     否则地名会变得比正文大一大截。
+
+     注意：这段必须放在 var svg 之后 —— var 会提升但值是 undefined，
+     放前面就会报 "Cannot read properties of undefined"。 */
+  (function fitMapBox(){
+    if (!svg) return;
+    var box = svg.parentNode;
+    var full = (svg.getAttribute("data-full") || "0 0 1000 900")
+                 .split(/\s+/).map(Number);
+    var core = (svg.getAttribute("data-core") || "").split(/\s+/).map(Number);
+    var fullW = full[2], fullH = full[3];
+    if (!(core.length === 4 && core[2] > 0 && core[3] > 0)) return;
+
+    // 标签字号随裁切倍数反向缩放
+    var st = document.getElementById("mapfit") || document.createElement("style");
+    st.id = "mapfit";
+    if (!st.parentNode) document.head.appendChild(st);
+
+    var last = "";
+    function apply(){
+      var vw = window.innerWidth;
+      var portrait = vw < 900 && window.innerHeight >= vw;
+      var useCore = portrait;
+      var vb = useCore ? core : full;
+      var key = vb.join(",") + "|" + box.clientWidth + "x" + box.clientHeight;
+      if (key === last) return;
+      last = key;
+
+      if (!useCore){
+        svg.setAttribute("viewBox", full.join(" "));
+        st.textContent = "";
+        return;
+      }
+
+      /* 在核心框基础上放宽到跟容器同比例，避免 meet 又留边。
+         容器比例 = w/h；核心框比例差太多就补出去（不裁内容）。 */
+      var availW = box.clientWidth  || vw;
+      var availH = box.clientHeight || (window.innerHeight * 0.55);
+      var want = availW / availH;
+      var x = vb[0], y = vb[1], w = vb[2], h = vb[3];
+      if (w / h > want){                       // 核心框更宽 → 补高
+        var nh = w / want, extra = nh - h;
+        y = Math.max(0, y - extra / 2);
+        h = nh;
+        if (y + h > fullH){ y = Math.max(0, fullH - h); h = Math.min(h, fullH - y); }
+      } else {                                  // 核心框更高 → 补宽
+        var nw = h * want, ex = nw - w;
+        x = Math.max(0, x - ex / 2);
+        w = nw;
+        if (x + w > fullW){ x = Math.max(0, fullW - w); w = Math.min(w, fullW - x); }
+      }
+      svg.setAttribute("viewBox", [x, y, w, h].map(function(v){ return +v.toFixed(1); }).join(" "));
+
+      // 反比缩放标签（基准：完整框显示时的字号）
+      var k = (w / fullW);
+      st.textContent = k < 0.995
+        ? "#mapsvg .nd text.nm{font-size:" + (24 * k).toFixed(2) + "px!important}"
+        + "#mapsvg .nd text.dt{font-size:" + (15 * k).toFixed(2) + "px!important}"
+        : "";
+    }
+
+    apply();
+    window.addEventListener("resize", function(){ setTimeout(apply, 120); });
+    window.addEventListener("orientationchange", function(){ setTimeout(apply, 260); });
+    if (window.ResizeObserver) { try { new ResizeObserver(apply).observe(box); } catch(e){} }
+  })();
+
   var nodes = [].slice.call(document.querySelectorAll("#mapsvg .nd"));
   var march = document.getElementById("march");
   var pnow = document.getElementById("pnow");
